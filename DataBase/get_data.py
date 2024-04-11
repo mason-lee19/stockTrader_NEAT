@@ -1,4 +1,4 @@
-from StockEnv import ApplyIndicators
+from Indicators import ApplyIndicators
 
 from sqlalchemy import create_engine,text
 import pandas as pd
@@ -28,12 +28,14 @@ class StockDataHandler:
     def query_ticker(self,ticker:str):
         try:
             query = f"SELECT * FROM {self.table_name} WHERE ticker = '{ticker}'"
+            print(f'Found {ticker} in {self.table_name}')
             return pd.read_sql(query,self.engine)
         except:
             print(f'Could not find query for ticker: {ticker}')
             print(f'Attempting to download data for: {ticker}')
             df = self.pull_stock_data_yf(ticker)
             df = ApplyIndicators().apply_ta(df)
+            df.dropna(inplace=True)
             self.push_to_db(df)
             print(f'Retrying query for ticker: {ticker}')
 
