@@ -72,3 +72,5 @@ class ResultsDataHandler:
         self.engine = create_engine(config.url)
         self.table_name = config.table_name
 
+    def push_to_db(self,df:pd.DataFrame):
+        df.to_sql(self.table_name, con=self.engine, if_exists='append',index=False)
