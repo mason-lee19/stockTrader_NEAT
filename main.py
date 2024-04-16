@@ -4,88 +4,117 @@ import pickle
 import neat
 import pandas as pd
 import os
-import numpy as np
+from tqdm import tqdm
 
 # Dollar Amount of stock to buy each buy signal
 TRADE_AMOUNT = 1000
 # Runs we try per stock in stock list
 RUNS_PER_STOCK = 20
 # Once a good model has been found test on 100 runs to test robustness
-WINNER_RUNS_PER_STOCK = 100
+WINNER_RUNS_PER_STOCK = 50
 
 # Amount of pre trading days to normalize trading period data
 PRE_TRADE_DAYS = 30
 # Amount of trading days
 TRADING_DAYS = 90
-
 # Stocks we want to run
 STOCK_LIST = ['BTC-USD']
 
+# Speciation specs
+TRANSITION_GENERATION = 50
+# Initial and final speciation thresh
+INIT_SPEC_THRESH = 3.0
+FINAL_SPEC_THRESH = 1.0
+INIT_SPEC_COUNT = 20
+TARGET_SPEC_COUNT = 40
+
 class TradeStock:
     def __init__(self):
-        self.game = StockEnv(STOCK_LIST,TRADE_AMOUNT,RUNS_PER_STOCK,    PRE_TRADE_DAYS,TRADING_DAYS)
+        self.game = StockEnv(STOCK_LIST,TRADE_AMOUNT,RUNS_PER_STOCK,PRE_TRADE_DAYS,TRADING_DAYS)
+        self.generation_count = 0
 
     def begin_trading(self,net=None):
         return self.game.trade_loop(net)
 
-def eval_genomes(genomes,config):
-    results = pd.DataFrame()
-    all_genome_fitness = []
-    resulting_balance = []
-    
-    for genome_id, genome in genomes:
-        net = neat.nn.FeedForwardNetowrk.create(genome,config)
-        fitness = 0
+class Neat:
+    def __init__(self,config):
+        self.config = config
+        self.current_generation = 1
+        self.cur_species_count = 20
+
+    def run_neat(self):
+        p = neat.Population(self.config)
+        p.add_reporter(neat.StdOutReporter(True))
+        stats = neat.StatisticsReporter()
+        p.add_reporter(stats)
+
+        winner = p.run(self.eval_genomes)
+
+        with open("best.pickle","wb") as f:
+            pickle.dump(winner,f)
+
+    def test_best_network(self):
+        print(f'Testing best Netowrk')
+        with open("best.pickle","rb") as f:
+            winner = pickle.load(f)
+        winner_net = neat.nn.FeedForwardNetwork.create(winner,self.config)
+
         new_run = TradeStock()
-
-        for _ in range(RUNS_PER_STOCK):
-            fitness += new_run.begin_trading(net)
+        for i in range(WINNER_RUNS_PER_STOCK):
+            new_run.begin_trading(winner_net)
+            print(f'run {i}     profit: {new_run.game.profit_percentage}')
+            new_run.game.profit_percentage = 0
         
-        #temp_df = pd.DataFrame.from_dict(new_run.game.analysis_df)
-        #results = pd.concat([results,temp_df],ignore_index=True)
+    def eval_genomes(self,genomes,config):
 
-        genome.fitness = fitness
+        # Calculate speciation threshold to push exploration in the beginning and exploitation in the later generations
+        speciation_threshold = 0.0
+        speciation_pressure = max(0, TARGET_SPEC_COUNT-self.cur_species_count) / INIT_SPEC_COUNT
+        speciation_threshold = INIT_SPEC_COUNT * (1-speciation_pressure)
 
-        all_genome_fitness.append(genome.fitness)
-        resulting_balance.append(new_run.game.profit)
+        self.config.species_set_config.speciation_threshold = speciation_threshold
 
-    # Push results to db
 
-    #####
+        for i in tqdm(range(len(genomes))):
+            genome = genomes[i][1]
 
-    # Plot results if you want
+            net = neat.nn.FeedForwardNetwork.create(genome,self.config)
+            fitness = 0
+            new_run = TradeStock()
 
-    ####
+            # Will iterate stocks and runs per stock within trade_loop
+            fitness += new_run.begin_trading(net)
+            
+            #temp_df = pd.DataFrame.from_dict(new_run.game.analysis_df)
+            #results = pd.concat([results,temp_df],ignore_index=True)
 
-def run_neat(config):
-    p = neat.Population(config)
-    p.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
-    p.add_reporter(stats)
+            genome.fitness = fitness
 
-    winner = p.run(eval_genomes)
-    with open("best.pickle","wb") as f:
-        pickle.dump(winner,f)
+            #all_genome_fitness.append(genome.fitness)
+            #resulting_profit.append(new_run.game.profit)
+        
+        self.current_generation += 1
 
-def test_best_network(config):
-    with open("best.pickle","rb") as f:
-        winner = pickle.load(f)
-    winner_net = neat.nn.FeedForwardNetwork.create(winner,config)
+        # Push results to db
 
-    new_run = TradeStock()
-    for _ in range(WINNER_RUNS_PER_STOCK):
-        new_run.begin_trading(winner_net)
+        #####
 
-    #temp_df = pd.DataFrame.from_dict(new_run.game.analysis_df)
-    
+        # Plot results if you want
+
+        ####
+
 if __name__ == '__main__':
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir,'config.txt')
 
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path)
 
-    new_run = TradeStock()
+    env = Neat(config)
 
     while True:
-        new_run.begin_trading(None)
+        #env.run_neat()
+        # After Threshold has been found we will test the best network
+        env.test_best_network()
+        break
+    print(f'Finished training')

@@ -92,6 +92,3 @@ class Indicators():
         column_name = 'EOM_' + str(time_period)
         self.df[column_name] = ta.EOM(self.df['High'], self.df['Low'], self.df['Volume'], timeperiod=time_period)
     
-
-    
-

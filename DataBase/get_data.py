@@ -28,7 +28,7 @@ class StockDataHandler:
     def query_ticker(self,ticker:str):
         try:
             query = f"SELECT * FROM {self.table_name} WHERE ticker = '{ticker}'"
-            print(f'Found {ticker} in {self.table_name}')
+            #print(f'Found {ticker} in {self.table_name}')
             return pd.read_sql(query,self.engine)
         except:
             print(f'Could not find query for ticker: {ticker}')
@@ -74,3 +74,7 @@ class ResultsDataHandler:
 
     def push_to_db(self,df:pd.DataFrame):
         df.to_sql(self.table_name, con=self.engine, if_exists='append',index=False)
+
+    def query_results(self):
+        query = f"SELECT * FROM {self.table_name}"
+        return pd.read_sql(query,self.engine)

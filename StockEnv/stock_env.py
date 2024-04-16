@@ -20,21 +20,24 @@ class StockEnv:
         self.pre_trade_days = pre_trade_days
         self.trading_days = trading_days
 
-        self.profit = 0
+        self.profit_percentage = 0
         self.buy_index = -1
         self.buy_signal = False
         self.sell_signal = False
 
         self.results = {'stock':[],
                         'run_num':[],
-                        'index':[],
-                        'price':[],
-                        'buy/sell':[]}
+                        'profit%':[],
+                        'buy_price':[],
+                        'sell_price':[]}
 
     def trade_loop(self,net):
+        # Set run variables to their start values
+        self.intialize_run_vars()
+
         # Loop for each stock
         for stock_ticker in self.stocks:
-            df = self.stock_db_connection(stock_ticker)
+            df = self.stock_db_connection.query_ticker(stock_ticker)
 
             # Loop runs per stock
             for run_num in range(self.runs_per_stock):
@@ -43,7 +46,7 @@ class StockEnv:
                                             (self.pre_trade_days+self.trading_days))
 
                 stock_slice = df.iloc[start_index:start_index+
-                                      self.pre_trade_days+self.trading_days]
+                                      self.pre_trade_days+self.trading_days].copy()
 
                 stock_slice.drop(columns=['ticker'],inplace=True)
                 stock_slice.dropna(inplace=True)
@@ -62,7 +65,7 @@ class StockEnv:
                               normalized_stock_slice['High'].iloc[idx],
                               normalized_stock_slice['Low'].iloc[idx],
                               normalized_stock_slice['Close'].iloc[idx],
-                              normalized_stock_slice['Volumne'].iloc[idx],
+                              normalized_stock_slice['Volume'].iloc[idx],
                               normalized_stock_slice['SMA_20'].iloc[idx],
                               normalized_stock_slice['SMA_50'].iloc[idx],
                               normalized_stock_slice['EMA_20'].iloc[idx],
@@ -85,34 +88,40 @@ class StockEnv:
                         self.buy_index = idx
                     # SELL Signal
                     elif decision == 1 and self.buy_signal:
-                        self.buy_signal = False
                         self.sell_signal = True
 
                         buy_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[self.buy_index]]
                         sell_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[idx]]
 
                         profit_percentage = self.calculate_profit_percentage(buy_price,sell_price)
-
-                        self.profit += self.trade_amount * profit_percentage
-
-                    # If == 2 than just wait
-
-                    if self.buy_signal or self.sell_signal:
-                        index = normalized_stock_slice['index'].iloc[idx]
-                        signal = 'Buy' if self.buy_signal else 'Sell'
+                        self.profit_percentage += profit_percentage*100
 
                         self.results['stock'].append(stock_ticker)
                         self.results['run_num'].append(run_num)
-                        self.results['index'].append(index)
-                        self.results['price'].append(df['Close'].iloc[index])
-                        self.results['buy/sell'].append(signal)
+                        self.results['profit%'].append(self.profit_percentage)
+                        self.results['buy_price'].append(buy_price)
+                        self.results['sell_price'].append(sell_price)
 
-                
-                    self.sell_signal = False
+                        self.buy_signal = False
+                        self.sell_signal = False
+
+                    # If == 2 than just wait
 
         
         # Push results to db
         self.results_db_connection.push_to_db(pd.DataFrame.from_dict(self.results))
+
+        # Want to try and remove strategies that just don't make trades
+        if self.profit_percentage == 0:
+            return -10.0
+
+        return self.profit_percentage
+
+    def intialize_run_vars(self):
+        self.profit = 0
+        self.buy_index = -1
+        self.buy_signal = False
+        self.sell_signal = False
 
     def normalize_data(self,col):
         rolling_max = col.rolling(window=90, min_periods=30).max()
@@ -122,8 +131,8 @@ class StockEnv:
 
         return normalized_col
 
-    def calculate_profit_percentage(buy_price,sell_price):
+    def calculate_profit_percentage(self,buy_price:int,sell_price:int):
         profit = sell_price - buy_price
-        profit_percentage = (profit / buy_price) * 100
+        profit_percentage = (profit / buy_price)
 
         return profit_percentage

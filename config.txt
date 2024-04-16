@@ -1,17 +1,17 @@
 [NEAT]
 fitness_criterion     = mean
-fitness_threshold     = 1000
+fitness_threshold     = 75
 pop_size              = 50
 reset_on_extinction   = false
 
 [DefaultStagnation]
 species_fitness_func = mean
-max_stagnation       = 50
+max_stagnation       = 40
 species_elitism      = 2
 
 [DefaultReproduction]
-elitism            = 2
-survival_threshold = 0.5
+elitism            = 4
+survival_threshold = 0.2
 
 [DefaultGenome]
 # node activation options
