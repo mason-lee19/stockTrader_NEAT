@@ -42,3 +42,13 @@ You can configure various aspects of the trading algorithm, including:
 - Database connection settings
 - Stock selection and data retrieval parameters
   Modify the configuration files (config.txt) to customize the algorithm according to your requirements.
+
+## Run Results
+
+With a fitness threshold of 75 (75 percent gains) I was able to train and find a model saved in the best.pickle file.
+
+![Results CMD window](Attachments/training_Results.png)
+
+Trying the best model with multiple runs shows consistently positive returns with backtesting.
+
+![Best Model Run Results](Attachments/BestModel_Results.png)
