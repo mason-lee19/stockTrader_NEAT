@@ -47,7 +47,7 @@ You can configure various aspects of the trading algorithm, including:
 
 With a fitness threshold of 75 (75 percent gains) I was able to train and find a model saved in the best.pickle file.
 
-![Results CMD window](Attachments/Training_Results.png)
+![Results CMD window](Attachments/Training_results.png)
 
 Trying the best model with multiple runs shows consistently positive returns with backtesting.
 
