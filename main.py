@@ -62,7 +62,7 @@ class Neat:
         new_run = TradeStock()
         for i in range(WINNER_RUNS_PER_STOCK):
             new_run.begin_trading(winner_net)
-            print(f'run {i}     profit: {new_run.game.profit_percentage}')
+            print(f'run {i}     avg profit: {new_run.game.profit_percentage/RUNS_PER_STOCK}')
             new_run.game.profit_percentage = 0
         
     def eval_genomes(self,genomes,config):
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     env = Neat(config)
 
     while True:
-        #env.run_neat()
+        env.run_neat()
         # After Threshold has been found we will test the best network
         env.test_best_network()
         break

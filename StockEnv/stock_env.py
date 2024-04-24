@@ -93,8 +93,8 @@ class StockEnv:
                         buy_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[self.buy_index]]
                         sell_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[idx]]
 
-                        profit_percentage = self.calculate_profit_percentage(buy_price,sell_price)
-                        self.profit_percentage += profit_percentage*100
+                        profit_percent = self.calculate_profit_percentage(buy_price,sell_price)
+                        self.profit_percentage += profit_percent*100
 
                         self.results['stock'].append(stock_ticker)
                         self.results['run_num'].append(run_num)
