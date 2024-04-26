@@ -1,13 +1,13 @@
 [NEAT]
 fitness_criterion     = mean
-fitness_threshold     = 75
+fitness_threshold     = 15
 pop_size              = 50
 reset_on_extinction   = false
 
 [DefaultStagnation]
 species_fitness_func = mean
-max_stagnation       = 40
-species_elitism      = 2
+max_stagnation       = 15
+species_elitism      = 4
 
 [DefaultReproduction]
 elitism            = 4
@@ -16,7 +16,7 @@ survival_threshold = 0.2
 [DefaultGenome]
 # node activation options
 activation_default      = sigmoid
-activation_mutate_rate  = 0.2
+activation_mutate_rate  = 0.7
 activation_options      = sigmoid
 
 # node aggregation options

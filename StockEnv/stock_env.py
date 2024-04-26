@@ -23,15 +23,15 @@ class StockEnv:
         self.profit_percentage = 0
         self.buy_index = -1
         self.buy_signal = False
-        self.sell_signal = False
 
         self.results = {'stock':[],
-                        'run_num':[],
+                        'generation':[],
+                        'genome_num':[],
                         'profit%':[],
                         'buy_price':[],
                         'sell_price':[]}
 
-    def trade_loop(self,net):
+    def trade_loop(self,net,generation,genome_num):
         # Set run variables to their start values
         self.intialize_run_vars()
 
@@ -42,8 +42,9 @@ class StockEnv:
             # Loop runs per stock
             for run_num in range(self.runs_per_stock):
                 # Pull random start index integer eg randint(30,len(df)-120) for a 30 pre window and 90 day trading window
+                # Subtract 252 to use the last year worth of data as validation
                 start_index = random.randint(self.pre_trade_days,len(df)-
-                                            (self.pre_trade_days+self.trading_days))
+                                            (self.pre_trade_days+self.trading_days)-252)
 
                 stock_slice = df.iloc[start_index:start_index+
                                       self.pre_trade_days+self.trading_days].copy()
@@ -88,7 +89,6 @@ class StockEnv:
                         self.buy_index = idx
                     # SELL Signal
                     elif decision == 1 and self.buy_signal:
-                        self.sell_signal = True
 
                         buy_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[self.buy_index]]
                         sell_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[idx]]
@@ -97,13 +97,13 @@ class StockEnv:
                         self.profit_percentage += profit_percent*100
 
                         self.results['stock'].append(stock_ticker)
-                        self.results['run_num'].append(run_num)
+                        self.results['generation'].append(generation)
+                        self.results['genome_num'].append(genome_num)
                         self.results['profit%'].append(self.profit_percentage)
                         self.results['buy_price'].append(buy_price)
                         self.results['sell_price'].append(sell_price)
 
                         self.buy_signal = False
-                        self.sell_signal = False
 
                     # If == 2 than just wait
 
@@ -116,6 +116,69 @@ class StockEnv:
             return -10.0
 
         return self.profit_percentage
+
+    def validation_loop(self,net):
+        self.intialize_run_vars()
+
+        for stock_ticker in self.stocks:
+
+            df = self.stock_db_connection.query_ticker(stock_ticker)
+
+            stock_slice = df.iloc[len(df)-252:len(df)].copy()
+
+            stock_slice.drop(columns=['ticker'],inplace=True)
+            stock_slice.dropna(inplace=True)
+
+            # column_names = stock_slice.columns.tolist()
+            
+            normalized_stock_slice = stock_slice.apply(self.normalize_data)
+            normalized_stock_slice.dropna(inplace=True)
+            # Reseting index allows utilization of ['index'] column to pull stock info from main df
+            normalized_stock_slice.reset_index(inplace=True)
+
+            for idx in range(30,len(normalized_stock_slice)):
+                inputs = (self.buy_signal,
+                          normalized_stock_slice['Open'].iloc[idx],
+                          normalized_stock_slice['High'].iloc[idx],
+                          normalized_stock_slice['Low'].iloc[idx],
+                          normalized_stock_slice['Close'].iloc[idx],
+                          normalized_stock_slice['Volume'].iloc[idx],
+                          normalized_stock_slice['SMA_20'].iloc[idx],
+                          normalized_stock_slice['SMA_50'].iloc[idx],
+                          normalized_stock_slice['EMA_20'].iloc[idx],
+                          normalized_stock_slice['RSI_14'].iloc[idx],
+                          normalized_stock_slice['MACD'].iloc[idx],
+                          normalized_stock_slice['MACD_Signal'].iloc[idx],
+                          normalized_stock_slice['BB_Upper'].iloc[idx],
+                          normalized_stock_slice['BB_Middle'].iloc[idx],
+                          normalized_stock_slice['BB_Lower'].iloc[idx],
+                          normalized_stock_slice['ATR_14'].iloc[idx],
+                          normalized_stock_slice['OBV'].iloc[idx],
+                          normalized_stock_slice['ADL'].iloc[idx])
+
+                output = net.activate(inputs)
+
+                decision = output.index(max(output))
+
+                if decision == 0 and not self.buy_signal:
+                    buy_signal = True
+                    self.buy_index = idx
+                elif decision == 1 and self.buy_signal:
+                    buy_signal = False
+
+                    buy_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[self.buy_index]]
+                    sell_price = df['Close'].iloc[normalized_stock_slice['index'].iloc[idx]]
+
+                    profit_percent = self.calculate_profit_percentage(buy_price,sell_price)
+                    self.profit_percentage += profit_percent*100
+
+        # Want to try and remove strategies that just don't make trades
+        if self.profit_percentage == 0:
+            return -10.0
+
+        return self.profit_percentage
+
+                    
 
     def intialize_run_vars(self):
         self.profit = 0

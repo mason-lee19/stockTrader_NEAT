@@ -9,9 +9,7 @@ from tqdm import tqdm
 # Dollar Amount of stock to buy each buy signal
 TRADE_AMOUNT = 1000
 # Runs we try per stock in stock list
-RUNS_PER_STOCK = 20
-# Once a good model has been found test on 100 runs to test robustness
-WINNER_RUNS_PER_STOCK = 50
+RUNS_PER_STOCK = 100
 
 # Amount of pre trading days to normalize trading period data
 PRE_TRADE_DAYS = 30
@@ -33,8 +31,11 @@ class TradeStock:
         self.game = StockEnv(STOCK_LIST,TRADE_AMOUNT,RUNS_PER_STOCK,PRE_TRADE_DAYS,TRADING_DAYS)
         self.generation_count = 0
 
-    def begin_trading(self,net=None):
-        return self.game.trade_loop(net)
+    def begin_training(self,net,generation,genome_num):
+        return self.game.trade_loop(net,generation,genome_num)
+
+    def begin_validation(self,net=None):
+        return self.game.validation_loop(net)
 
 class Neat:
     def __init__(self,config):
@@ -60,10 +61,9 @@ class Neat:
         winner_net = neat.nn.FeedForwardNetwork.create(winner,self.config)
 
         new_run = TradeStock()
-        for i in range(WINNER_RUNS_PER_STOCK):
-            new_run.begin_trading(winner_net)
-            print(f'run {i}     avg profit: {new_run.game.profit_percentage/RUNS_PER_STOCK}')
-            new_run.game.profit_percentage = 0
+        new_run.begin_validation(winner_net)
+        print(f'profit: {new_run.game.profit_percentage}')
+        
         
     def eval_genomes(self,genomes,config):
 
@@ -79,16 +79,17 @@ class Neat:
             genome = genomes[i][1]
 
             net = neat.nn.FeedForwardNetwork.create(genome,self.config)
-            fitness = 0
+            train_fitness = 0
             new_run = TradeStock()
 
             # Will iterate stocks and runs per stock within trade_loop
-            fitness += new_run.begin_trading(net)
+            train_fitness += new_run.begin_training(net,self.current_generation,genomes[i][0])
+            
             
             #temp_df = pd.DataFrame.from_dict(new_run.game.analysis_df)
             #results = pd.concat([results,temp_df],ignore_index=True)
 
-            genome.fitness = fitness
+            genome.fitness = train_fitness/self.config.pop_size
 
             #all_genome_fitness.append(genome.fitness)
             #resulting_profit.append(new_run.game.profit)
